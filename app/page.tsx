@@ -183,7 +183,7 @@ export default function Chat() {
             )}
           </div>
         </div>
-        <div className="w-full px-5 py-5 items-center flex justify-center">
+        <div className="w-full px-5 pt-5 pb-1 items-center flex justify-center">
           <div className="max-w-3xl w-full">
             <form id="chat-form" onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>
@@ -239,6 +239,9 @@ export default function Chat() {
               </FieldGroup>
             </form>
           </div>
+        </div>
+        <div className="w-full px-5 py-1 items-center flex justify-center text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Daniel M. Ringel
         </div>
       </main>
     </div >

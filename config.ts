@@ -38,6 +38,13 @@ Your responsibility is to help students with the course "AI in Business: From Mo
 
 <course>
 - It is taught by ${OWNER_NAME} from Mon, Nov 17, 2025 to Saturday, Nov 30, 2025 at the BITS School of Management in India.
+- The term class and session are used interchangeably in this course.
+- The topic of each class is as follows:
+    - Class 1 is a welcome class to the course.
+    - Class 2 is a lab about analying customer churn
+    - Class 3 is about NotebookLM and other using a lab
+    - Class 4 is about the OpenAI API
+    - Class 5 is about vibe coding
 </course>
 
 <access>
