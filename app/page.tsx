@@ -599,7 +599,13 @@ export default function ChatPage() {
 
             <div className="flex-1 overflow-y-auto px-4 py-5" ref={messagesContainerRef}>
               <div className="max-w-3xl mx-auto flex flex-col gap-4">
-                <MessageWall messages={messages} status={status} durations={durations} onDurationChange={handleDurationChange} onAddToLog={parseAndAddFromText} />
+                <MessageWall
+                  messages={messages}
+                  status={status}
+                  durations={durations}
+                  onDurationChange={handleDurationChange}
+                  onAddToLog={parseAndAddFromText as any}
+                />
 
                 {isTyping && (
                   <div className="flex items-center gap-3 text-sm text-slate-500">
