@@ -232,18 +232,64 @@ export default function ChatPage() {
             <div className="mt-3 space-y-2 text-sm">
               <label className="flex flex-col">
                 <span className="text-xs text-slate-500">Name</span>
-                <input id="profile-name" value={profile.name || ""} onChange={(e) => { setProfile(p => ({ ...p, name: e.target.value })); localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, name: e.target.value })); }} className="input mt-1" />
+                <input
+                  id="profile-name"
+                  value={profile.name || ""}
+                  onChange={(e) => {
+                    // annotate p with any to avoid implicit any TypeScript error
+                    setProfile((p: any) => ({ ...p, name: e.target.value }));
+                    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, name: e.target.value }));
+                  }}
+                  className="input mt-1"
+                />
               </label>
 
               <div className="grid grid-cols-3 gap-2">
-                <label className="flex flex-col text-xs"><span className="text-slate-500">Age</span><input value={profile.age || ""} onChange={(e) => { setProfile(p => ({ ...p, age: e.target.value })); localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, age: e.target.value })); }} className="input mt-1" /></label>
-                <label className="flex flex-col text-xs"><span className="text-slate-500">Height (cm)</span><input value={profile.heightCm || ""} onChange={(e) => { setProfile(p => ({ ...p, heightCm: e.target.value })); localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, heightCm: e.target.value })); }} className="input mt-1" /></label>
-                <label className="flex flex-col text-xs"><span className="text-slate-500">Weight (kg)</span><input value={profile.weightKg || ""} onChange={(e) => { setProfile(p => ({ ...p, weightKg: e.target.value })); localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, weightKg: e.target.value })); }} className="input mt-1" /></label>
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Age</span>
+                  <input
+                    value={profile.age || ""}
+                    onChange={(e) => {
+                      setProfile((p: any) => ({ ...p, age: e.target.value }));
+                      localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, age: e.target.value }));
+                    }}
+                    className="input mt-1"
+                  />
+                </label>
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Height (cm)</span>
+                  <input
+                    value={profile.heightCm || ""}
+                    onChange={(e) => {
+                      setProfile((p: any) => ({ ...p, heightCm: e.target.value }));
+                      localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, heightCm: e.target.value }));
+                    }}
+                    className="input mt-1"
+                  />
+                </label>
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Weight (kg)</span>
+                  <input
+                    value={profile.weightKg || ""}
+                    onChange={(e) => {
+                      setProfile((p: any) => ({ ...p, weightKg: e.target.value }));
+                      localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, weightKg: e.target.value }));
+                    }}
+                    className="input mt-1"
+                  />
+                </label>
               </div>
 
               <label className="flex flex-col text-xs">
                 <span className="text-slate-500">Activity level</span>
-                <select value={profile.activity || "Moderate"} onChange={(e) => { setProfile(p => ({ ...p, activity: e.target.value })); localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, activity: e.target.value })); }} className="input mt-1">
+                <select
+                  value={profile.activity || "Moderate"}
+                  onChange={(e) => {
+                    setProfile((p: any) => ({ ...p, activity: e.target.value }));
+                    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, activity: e.target.value }));
+                  }}
+                  className="input mt-1"
+                >
                   <option>Sedentary</option>
                   <option>Light</option>
                   <option>Moderate</option>
@@ -443,7 +489,7 @@ export default function ChatPage() {
               </div>
 
               <div className="mt-3 space-y-3">
-                {suggestedMeals.map(m => (
+                {suggestedMeals.map((m) => (
                   <div key={m.title} className="flex items-center justify-between p-3 rounded-md border border-slate-100 bg-white">
                     <div>
                       <div className="text-sm font-medium">{m.title}</div>
