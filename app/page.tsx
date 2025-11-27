@@ -100,7 +100,7 @@ const saveMessagesToStorage = (
 /* ============ Advanced Progress Ring Component ============ */
 
 function AnimatedProgressRing({ 
-  size = 120, 
+  size = 140, 
   stroke = 12, 
   progress = 0,
   label = "kcal",
@@ -123,11 +123,11 @@ function AnimatedProgressRing({
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative inline-flex items-center justify-center">
-        <svg width={size} height={size} className="drop-shadow-lg">
+        <svg width={size} height={size} className="drop-shadow-2xl">
           <defs>
             <linearGradient id={`gradient-${progress}`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#34D399" />
-              <stop offset="100%" stopColor="#059669" />
+              <stop offset="0%" stopColor="#6366F1" />
+              <stop offset="100%" stopColor="#14B8A6" />
             </linearGradient>
             <filter id="glow">
               <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -141,9 +141,9 @@ function AnimatedProgressRing({
             <circle 
               r={radius} 
               fill="none" 
-              stroke="#E5E7EB" 
+              stroke="#E6E6F7" 
               strokeWidth={stroke}
-              opacity="0.3"
+              opacity="0.35"
             />
             <circle
               r={radius}
@@ -180,7 +180,7 @@ function NutritionCard({
   current, 
   goal, 
   icon: Icon,
-  color = "emerald"
+  color = "indigo"
 }: {
   title: string;
   current: number;
@@ -190,14 +190,14 @@ function NutritionCard({
 }) {
   const progress = Math.min(100, (current / goal) * 100);
   const colors: Record<string, { bg: string; text: string; bar: string }> = {
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-700", bar: "bg-gradient-to-r from-emerald-400 to-emerald-600" },
+    indigo: { bg: "bg-indigo-50", text: "text-indigo-700", bar: "bg-gradient-to-r from-indigo-400 to-teal-400" },
     blue: { bg: "bg-blue-50", text: "text-blue-700", bar: "bg-gradient-to-r from-blue-400 to-blue-600" },
     orange: { bg: "bg-orange-50", text: "text-orange-700", bar: "bg-gradient-to-r from-orange-400 to-orange-600" },
   };
-  const c = colors[color] || colors.emerald;
+  const c = colors[color] || colors.indigo;
 
   return (
-    <div className={`${c.bg} rounded-xl p-4 border border-${color}-200`}>
+    <div className={`${c.bg} rounded-xl p-4 border ${c.bg === 'bg-indigo-50' ? 'border-indigo-200' : 'border-slate-200'}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Icon className={`w-5 h-5 ${c.text}`} />
@@ -232,18 +232,18 @@ function MealCard({
   onLoad: () => void;
 }) {
   return (
-    <div className="group relative bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-emerald-300 transition-all duration-300 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div className="group relative bg-white border border-slate-200 rounded-xl p-4 hover:shadow-lg hover:border-indigo-300 transition-all duration-300 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-transparent opacity-0 group-hover:opacity-60 transition-opacity" />
       
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h4 className="text-sm font-semibold text-slate-800 group-hover:text-emerald-700 transition">{title}</h4>
+            <h4 className="text-sm font-semibold text-slate-800 group-hover:text-indigo-700 transition">{title}</h4>
             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
               <Clock className="w-3 h-3" /> {prepTime} min
             </p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
+          <div className="bg-gradient-to-br from-indigo-400 to-teal-400 text-white px-3 py-1 rounded-lg text-sm font-bold">
             {calories}
           </div>
         </div>
@@ -265,7 +265,7 @@ function MealCard({
 
         <button
           onClick={onLoad}
-          className="w-full px-3 py-2 bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-lg hover:bg-emerald-100 transition group-hover:bg-emerald-600 group-hover:text-white"
+          className="w-full px-3 py-2 bg-indigo-50 text-indigo-700 text-sm font-semibold rounded-lg hover:bg-indigo-600 hover:text-white transition group-hover:bg-indigo-600 group-hover:text-white"
         >
           Load & Ask
         </button>
@@ -291,7 +291,7 @@ function AchievementBadge({
     <div className={`flex flex-col items-center p-3 rounded-lg border-2 transition ${
       unlocked 
         ? "bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-300" 
-        : "bg-slate-50 border-slate-200 opacity-50"
+        : "bg-slate-50 border-slate-200 opacity-60"
     }`}>
       <div className={`text-3xl mb-2 ${unlocked ? "scale-110" : ""} transition`}>
         {unlocked ? (
@@ -426,331 +426,338 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 font-sans antialiased">
-      {/* Floating Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-10 w-72 h-72 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
-        <div className="absolute bottom-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" />
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-teal-50" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial' }}>
+      {/* Outer Aspect Box: keeps layout ~16:9 and uses ~80% of viewport */}
+      <div
+        className="relative rounded-3xl shadow-2xl overflow-hidden w-[80vw] max-w-[1400px] sm:w-[92vw]"
+        style={{
+          height: 'calc(min(80vh, (80vw * 9) / 16))',
+          maxHeight: '86vh',
+          background: 'radial-gradient(1200px 400px at 10% 10%, rgba(99,102,241,0.06), transparent), radial-gradient(800px 300px at 90% 90%, rgba(20,184,166,0.04), transparent)',
+        }}
+      >
+        {/* Decorative blurred shapes */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-indigo-200 opacity-20 blur-3xl transform -rotate-12" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-teal-200 opacity-18 blur-3xl transform rotate-12" />
 
-      <main className="relative z-10 max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-12 gap-4 lg:gap-6 min-h-screen">
-        {/* Left Navigation Sidebar */}
-        <nav className="col-span-1 hidden xl:flex flex-col items-center gap-6 pt-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-2xl shadow-lg hover:shadow-xl transition transform hover:scale-110">
-            🥗
-          </div>
-          <div className="flex flex-col gap-4">
-            <button className="p-3 rounded-lg bg-white border-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition">
-              <Heart className="w-5 h-5" />
-            </button>
-            <button className="p-3 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-              <TrendingUp className="w-5 h-5" />
-            </button>
-            <button className="p-3 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-              <Zap className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="mt-auto text-xs text-slate-400 font-semibold">v2.0</div>
-        </nav>
-
-        {/* Center Chat Section */}
-        <section className="col-span-12 lg:col-span-7 xl:col-span-6 flex flex-col gap-4 lg:gap-5">
-          {/* Hero Card */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 backdrop-blur flex items-center justify-between hover:shadow-md transition">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-3xl shadow-lg">
-                🥗
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent">
-                  NutriBuddy Premium
-                </h2>
-                <p className="text-sm text-slate-500">AI nutrition & meal planning</p>
-              </div>
+        <main className="relative z-10 h-full p-6 grid grid-cols-12 gap-6">
+          {/* Left Navigation (compact) */}
+          <nav className="col-span-1 hidden lg:flex flex-col items-center gap-6 pt-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-teal-400 flex items-center justify-center text-2xl shadow-lg hover:shadow-xl transition transform hover:scale-110 text-white">
+              🥗
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={clearChat}
-                className="hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition"
-              >
-                <Eraser className="w-4 h-4 mr-1" />
-                Clear
-              </Button>
-              <Button 
-                size="sm"
-                onClick={() => toast.success("Saved! ✨")}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Save
-              </Button>
+            <div className="flex flex-col gap-4">
+              <button className="p-3 rounded-lg bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 transition">
+                <Heart className="w-5 h-5" />
+              </button>
+              <button className="p-3 rounded-lg bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 transition">
+                <TrendingUp className="w-5 h-5" />
+              </button>
+              <button className="p-3 rounded-lg bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 transition">
+                <Zap className="w-5 h-5" />
+              </button>
             </div>
-          </div>
+            <div className="mt-auto text-xs text-slate-400 font-semibold">v2.0</div>
+          </nav>
 
-          {/* Main Chat Card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col h-[calc(100vh-280px)] overflow-hidden hover:shadow-2xl transition">
-            {/* Chat Header */}
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-50 to-emerald-50">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-lg shadow-md">
-                  🤖
+          {/* Chat Area: wider now (use more of the 16 cols equivalent) */}
+          <section className="col-span-12 lg:col-span-8 flex flex-col gap-4 lg:gap-5 h-full">
+            {/* Hero Card */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-teal-400 flex items-center justify-center text-3xl shadow-lg text-white">
+                  🥗
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">Live Chat</div>
-                  <div className="text-xs text-slate-500">Powered by AI • {status}</div>
+                  <h2 className="text-2xl font-extrabold bg-gradient-to-r from-indigo-700 to-teal-500 bg-clip-text text-transparent leading-tight">
+                    NutriBuddy Premium
+                  </h2>
+                  <p className="text-sm text-slate-500">AI nutrition & meal planning — modern, clean, and fast</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${status === "streaming" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
-                <span className="text-xs text-slate-500">{status === "streaming" ? "Thinking..." : "Ready"}</span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearChat}
+                  className="hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition"
+                >
+                  <Eraser className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => toast.success("Saved! ✨")}
+                  className="bg-gradient-to-r from-indigo-600 to-teal-500 text-white hover:opacity-95"
+                >
+                  Save
+                </Button>
               </div>
             </div>
 
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto px-5 py-6 scroll-smooth">
-              <div className="max-w-2xl mx-auto flex flex-col gap-4">
-                <MessageWall messages={messages} status={status} durations={durations} onDurationChange={handleDurationChange} />
-
-                {isTyping && (
-                  <div className="flex items-center gap-3 text-sm text-slate-500 animate-in fade-in slide-in-from-bottom-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-xs font-bold text-white">
-                      AI
-                    </div>
-                    <div className="px-4 py-3 rounded-2xl bg-gradient-to-r from-slate-100 to-slate-50 flex items-center gap-2">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </div>
-                      <span className="text-slate-600 font-medium">NutriBuddy is analyzing...</span>
-                    </div>
+            {/* Main Chat Card - occupy most vertical space */}
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col h-[calc(100% - 110px)] overflow-hidden">
+              {/* Chat Header */}
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-indigo-500 to-teal-400 flex items-center justify-center text-lg shadow-md text-white">
+                    🤖
                   </div>
-                )}
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">Live Chat</div>
+                    <div className="text-xs text-slate-500">Powered by AI • {status}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${status === "streaming" ? "bg-teal-500 animate-pulse" : "bg-slate-300"}`} />
+                  <span className="text-xs text-slate-500">{status === "streaming" ? "Thinking..." : "Ready"}</span>
+                </div>
+              </div>
 
-                <div ref={messagesEndRef} />
+              {/* Messages Container */}
+              <div className="flex-1 overflow-y-auto px-6 py-6 scroll-smooth bg-gradient-to-b from-white to-indigo-50/30">
+                <div className="max-w-3xl mx-auto flex flex-col gap-4">
+                  <MessageWall messages={messages} status={status} durations={durations} onDurationChange={handleDurationChange} />
+
+                  {isTyping && (
+                    <div className="flex items-center gap-3 text-sm text-slate-500 animate-in fade-in slide-in-from-bottom-4">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-teal-400 flex items-center justify-center text-xs font-bold text-white">
+                        AI
+                      </div>
+                      <div className="px-4 py-3 rounded-2xl bg-white/60 backdrop-blur flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                        <span className="text-slate-600 font-medium">NutriBuddy is analyzing...</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* Sticky Composer */}
+              <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-slate-100 backdrop-blur bg-opacity-95">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl mx-auto space-y-3">
+                  <FieldGroup>
+                    <Controller
+                      name="message"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Field className="flex items-center gap-3">
+                          <div className="flex-1 relative">
+                            <Input
+                              {...field}
+                              placeholder="Ask me anything: meal plans, recipes, macros, calories..."
+                              className="flex-1 h-14 rounded-2xl border-2 border-slate-200 shadow-sm px-5 focus:border-indigo-400 focus:shadow-lg transition bg-white hover:border-slate-300"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  form.handleSubmit(onSubmit)();
+                                }
+                              }}
+                            />
+                          </div>
+
+                          {(status === "ready" || status === "error") && (
+                            <Button 
+                              type="submit" 
+                              size="icon" 
+                              className="rounded-full bg-gradient-to-r from-indigo-600 to-teal-500 hover:from-indigo-700 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition transform hover:scale-105"
+                              disabled={!field.value.trim()}
+                            >
+                              <ArrowUp className="w-5 h-5" />
+                            </Button>
+                          )}
+
+                          {(status === "streaming" || status === "submitted") && (
+                            <Button 
+                              size="icon" 
+                              className="rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 transition"
+                              onClick={() => stop()}
+                            >
+                              <Square className="w-5 h-5" />
+                            </Button>
+                          )}
+                        </Field>
+                      )}
+                    />
+                  </FieldGroup>
+
+                  {/* Quick Prompts */}
+                  <div className="flex flex-wrap gap-2">
+                    {quickPrompts.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => {
+                          form.setValue("message", q);
+                          toast.success("Prompt ready! Press Enter ↩️");
+                        }}
+                        className="px-3 py-1.5 rounded-full text-sm font-medium bg-white border border-slate-100 text-indigo-700 hover:shadow-sm transition"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </form>
               </div>
             </div>
+          </section>
 
-            {/* Sticky Composer */}
-            <div className="sticky bottom-0 bg-white px-5 py-5 border-t border-slate-200 backdrop-blur bg-opacity-95">
-              <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl mx-auto space-y-3">
-                <FieldGroup>
-                  <Controller
-                    name="message"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Field className="flex items-center gap-3">
-                        <div className="flex-1 relative">
-                          <Input
-                            {...field}
-                            placeholder="Ask me anything: meal plans, recipes, macros, calories..."
-                            className="flex-1 h-14 rounded-2xl border-2 border-slate-200 shadow-sm px-5 focus:border-emerald-400 focus:shadow-lg transition bg-white hover:border-slate-300"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                form.handleSubmit(onSubmit)();
-                              }
-                            }}
-                          />
-                        </div>
+          {/* Right Insights & Tracking Sidebar (slim) */}
+          <aside className="col-span-12 lg:col-span-4 flex flex-col gap-4 lg:gap-5 h-full overflow-y-auto">
+            {/* Today's Snapshot */}
+            <div className="bg-white/90 rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">📊 Today's Snapshot</h3>
+                  <p className="text-xs text-slate-500">Nutrition & goals</p>
+                </div>
+                <button 
+                  onClick={() => setShowAchievements(!showAchievements)}
+                  className="text-2xl hover:scale-125 transition"
+                >
+                  {showAchievements ? "📈" : "🎖️"}
+                </button>
+              </div>
 
-                        {(status === "ready" || status === "error") && (
-                          <Button 
-                            type="submit" 
-                            size="icon" 
-                            className="rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition transform hover:scale-105"
-                            disabled={!field.value.trim()}
-                          >
-                            <ArrowUp className="w-5 h-5" />
-                          </Button>
-                        )}
+              {!showAchievements ? (
+                <>
+                  <div className="flex justify-center mb-5">
+                    <AnimatedProgressRing 
+                      size={140} 
+                      stroke={12} 
+                      progress={calorieProgress}
+                      value={latestCalories}
+                      goal={userProfile.calorieGoal}
+                    />
+                  </div>
 
-                        {(status === "streaming" || status === "submitted") && (
-                          <Button 
-                            size="icon" 
-                            className="rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 transition"
-                            onClick={() => stop()}
-                          >
-                            <Square className="w-5 h-5" />
-                          </Button>
-                        )}
-                      </Field>
-                    )}
-                  />
-                </FieldGroup>
+                  <div className="space-y-3">
+                    <NutritionCard 
+                      title="Protein" 
+                      current={45} 
+                      goal={userProfile.proteinGoal}
+                      icon={Zap}
+                      color="blue"
+                    />
+                    <NutritionCard 
+                      title="Carbs" 
+                      current={120} 
+                      goal={280}
+                      icon={UtensilsCrossed}
+                      color="orange"
+                    />
+                    <NutritionCard 
+                      title="Water" 
+                      current={2400} 
+                      goal={userProfile.waterGoal}
+                      icon={Droplets}
+                      color="indigo"
+                    />
+                  </div>
 
-                {/* Quick Prompts */}
-                <div className="flex flex-wrap gap-2">
-                  {quickPrompts.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        form.setValue("message", q);
-                        toast.success("Prompt ready! Press Enter ↩️");
-                      }}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 hover:from-emerald-100 hover:to-emerald-200 border border-emerald-200 transition hover:shadow-md hover:-translate-y-0.5"
+                  <div className="mt-4 flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-xs"
+                      onClick={() => toast.success("Export in PDF (demo) 📥")}
                     >
-                      {q}
-                    </button>
+                      <Download className="w-3 h-3 mr-1" /> Export
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      className="flex-1 text-xs bg-gradient-to-r from-indigo-600 to-teal-500 text-white"
+                      onClick={() => toast.success("Shared! 🔗")}
+                    >
+                      <Share2 className="w-3 h-3 mr-1" /> Share
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {achievements.map((a) => (
+                    <AchievementBadge key={a.title} {...a} />
                   ))}
                 </div>
-              </form>
+              )}
             </div>
-          </div>
-        </section>
 
-        {/* Right Insights & Tracking Sidebar */}
-        <aside className="col-span-12 lg:col-span-5 xl:col-span-4 flex flex-col gap-4 lg:gap-5 max-h-[calc(100vh-100px)] overflow-y-auto">
-          
-          {/* Today's Snapshot */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">📊 Today's Snapshot</h3>
-                <p className="text-xs text-slate-500">Nutrition & goals</p>
+            {/* Suggested Meals */}
+            <div className="bg-white/90 rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">🍽️ Meal Suggestions</h3>
+                  <p className="text-xs text-slate-500">Based on your goals</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
-              <button 
-                onClick={() => setShowAchievements(!showAchievements)}
-                className="text-2xl hover:scale-125 transition"
-              >
-                {showAchievements ? "📈" : "🎖️"}
-              </button>
-            </div>
-
-            {!showAchievements ? (
-              <>
-                <div className="flex justify-center mb-5">
-                  <AnimatedProgressRing 
-                    size={120} 
-                    stroke={12} 
-                    progress={calorieProgress}
-                    value={latestCalories}
-                    goal={userProfile.calorieGoal}
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {suggestedMeals.map((m) => (
+                  <MealCard
+                    key={m.title}
+                    title={m.title}
+                    calories={m.calories}
+                    macros={m.macros}
+                    prepTime={m.prepTime}
+                    onLoad={() => {
+                      form.setValue("message", `Tell me more about: ${m.title} — ingredients, cooking steps, nutritional info?`);
+                      toast.success("Loaded! Press Enter ↩️");
+                    }}
                   />
-                </div>
-
-                <div className="space-y-3">
-                  <NutritionCard 
-                    title="Protein" 
-                    current={45} 
-                    goal={userProfile.proteinGoal}
-                    icon={Zap}
-                    color="blue"
-                  />
-                  <NutritionCard 
-                    title="Carbs" 
-                    current={120} 
-                    goal={280}
-                    icon={UtensilsCrossed}
-                    color="orange"
-                  />
-                  <NutritionCard 
-                    title="Water" 
-                    current={2400} 
-                    goal={userProfile.waterGoal}
-                    icon={Droplets}
-                    color="blue"
-                  />
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1 text-xs"
-                    onClick={() => toast.success("Export in PDF (demo) 📥")}
-                  >
-                    <Download className="w-3 h-3 mr-1" /> Export
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => toast.success("Shared! 🔗")}
-                  >
-                    <Share2 className="w-3 h-3 mr-1" /> Share
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {achievements.map((a) => (
-                  <AchievementBadge key={a.title} {...a} />
                 ))}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Suggested Meals */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">🍽️ Meal Suggestions</h3>
-                <p className="text-xs text-slate-500">Based on your goals</p>
+            {/* Insights & Tips */}
+            <div className="bg-gradient-to-br from-indigo-50 to-teal-50 rounded-2xl p-5 shadow-sm border border-indigo-100 hover:shadow-md transition">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-800">💡 Pro Tips</h3>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <ul className="space-y-2 text-xs text-slate-700">
+                <li className="flex gap-2">
+                  <span className="text-indigo-600">→</span>
+                  <span>Prep meals on Sunday for consistent goals</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-indigo-600">→</span>
+                  <span>Drink water 30 min before meals</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-indigo-600">→</span>
+                  <span>High-protein snacks keep you fuller</span>
+                </li>
+              </ul>
             </div>
-            <div className="space-y-3 max-h-72 overflow-y-auto">
-              {suggestedMeals.map((m) => (
-                <MealCard
-                  key={m.title}
-                  title={m.title}
-                  calories={m.calories}
-                  macros={m.macros}
-                  prepTime={m.prepTime}
-                  onLoad={() => {
-                    form.setValue("message", `Tell me more about: ${m.title} — ingredients, cooking steps, nutritional info?`);
-                    toast.success("Loaded! Press Enter ↩️");
-                  }}
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* Insights & Tips */}
-          <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-2xl p-5 shadow-sm border border-emerald-200 hover:shadow-md transition">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-800">💡 Pro Tips</h3>
+            {/* Footer */}
+            <div className="bg-white/80 rounded-2xl p-4 shadow-sm border border-slate-100 text-center">
+              <p className="text-xs text-slate-500 mb-2">
+                © {new Date().getFullYear()} {OWNER_NAME}
+              </p>
+              <div className="flex items-center justify-center gap-4 text-xs">
+                <Link href="/terms" className="text-indigo-600 hover:underline font-medium">
+                  Terms
+                </Link>
+                <span className="text-slate-300">•</span>
+                <Link href="/privacy" className="text-indigo-600 hover:underline font-medium">
+                  Privacy
+                </Link>
+                <span className="text-slate-300">•</span>
+                <button className="text-indigo-600 hover:underline font-medium">
+                  Help
+                </button>
+              </div>
             </div>
-            <ul className="space-y-2 text-xs text-slate-700">
-              <li className="flex gap-2">
-                <span className="text-emerald-600">→</span>
-                <span>Prep meals on Sunday for consistent goals</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-emerald-600">→</span>
-                <span>Drink water 30 min before meals</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-emerald-600">→</span>
-                <span>High-protein snacks keep you fuller</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Footer */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 text-center">
-            <p className="text-xs text-slate-500 mb-2">
-              © {new Date().getFullYear()} {OWNER_NAME}
-            </p>
-            <div className="flex items-center justify-center gap-4 text-xs">
-              <Link href="/terms" className="text-emerald-600 hover:underline font-medium">
-                Terms
-              </Link>
-              <span className="text-slate-300">•</span>
-              <Link href="/privacy" className="text-emerald-600 hover:underline font-medium">
-                Privacy
-              </Link>
-              <span className="text-slate-300">•</span>
-              <button className="text-emerald-600 hover:underline font-medium">
-                Help
-              </button>
-            </div>
-          </div>
-        </aside>
-      </main>
+          </aside>
+        </main>
+      </div>
     </div>
   );
 }
