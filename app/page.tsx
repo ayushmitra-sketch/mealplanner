@@ -28,49 +28,63 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-/* ---------------- validation + storage ---------------- */
+/* ---------------- constants + storage keys ---------------- */
+
+const STORAGE_KEY = "chat-messages"; // existing messages storage
+const SAVED_CONVS_KEY = "nutribuddy-saved-convs"; // saved conversations (history)
+const PROFILE_KEY = "nutribuddy-profile";
 
 const formSchema = z.object({
   message: z.string().min(1).max(2000),
 });
 
-const STORAGE_KEY = "chat-messages";
+/* ---------------- small helper types ---------------- */
 
-type StorageData = {
+type SavedConversation = {
+  id: string;
+  title: string;
+  createdAt: string; // ISO
   messages: UIMessage[];
-  durations: Record<string, number>;
 };
 
-const loadMessagesFromStorage = (): StorageData => {
-  if (typeof window === "undefined") return { messages: [], durations: {} };
+/* ---------------- tiny helpers ---------------- */
+
+const dateFmt = (iso?: string) =>
+  iso ? new Date(iso).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
+const loadSavedConversations = (): SavedConversation[] => {
+  if (typeof window === "undefined") return [];
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return { messages: [], durations: {} };
-    const parsed = JSON.parse(stored) as StorageData;
-    return {
-      messages: parsed.messages || [],
-      durations: parsed.durations || {},
-    };
-  } catch (error) {
-    // If malformed, return empty safely
-    // eslint-disable-next-line no-console
-    console.error("Failed to load messages from localStorage:", error);
-    return { messages: [], durations: {} };
+    const raw = localStorage.getItem(SAVED_CONVS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as SavedConversation[];
+  } catch {
+    return [];
   }
 };
 
-const saveMessagesToStorage = (messages: UIMessage[], durations: Record<string, number>) => {
+const saveSavedConversations = (convs: SavedConversation[]) => {
   if (typeof window === "undefined") return;
+  localStorage.setItem(SAVED_CONVS_KEY, JSON.stringify(convs));
+};
+
+const loadProfile = () => {
+  if (typeof window === "undefined") return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
   try {
-    const data: StorageData = { messages, durations };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("Failed to save messages to localStorage:", error);
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
+    return JSON.parse(raw);
+  } catch {
+    return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
   }
 };
 
-/* ---------------- small UI helper ---------------- */
+const saveProfile = (p: any) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+};
+
+/* ---------------- small UI helper - ProgressRing ---------------- */
 
 function ProgressRing({ size = 96, stroke = 10, progress = 0 }: { size?: number; stroke?: number; progress: number }) {
   const radius = (size - stroke) / 2;
@@ -104,34 +118,67 @@ function ProgressRing({ size = 96, stroke = 10, progress = 0 }: { size?: number;
   );
 }
 
-/* ---------------- page component ---------------- */
+/* ---------------- MAIN PAGE (drop-in) ---------------- */
 
 export default function ChatPage() {
+  // client flags & storage
   const [isClient, setIsClient] = useState(false);
-  const stored = typeof window !== "undefined" ? loadMessagesFromStorage() : { messages: [], durations: {} };
+  const stored = typeof window !== "undefined" ? (() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { messages: [], durations: {} };
+      const parsed = JSON.parse(raw);
+      return { messages: parsed.messages || [], durations: parsed.durations || {} };
+    } catch {
+      return { messages: [], durations: {} };
+    }
+  })() : { messages: [], durations: {} };
+
   const [initialMessages] = useState<UIMessage[]>(stored.messages || []);
   const [durations, setDurations] = useState<Record<string, number>>(stored.durations || {});
   const [isTyping, setIsTyping] = useState(false);
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
-    messages: initialMessages,
+  // saved conversations & profile
+  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() => loadSavedConversations());
+  const [profile, setProfileState] = useState(() => loadProfile());
+
+  // chat hook
+  const { messages, sendMessage, status, stop, setMessages } = useChat({ messages: initialMessages });
+
+  // refs
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const welcomeShownRef = useRef(false);
+
+  // form
+  const form = useForm<{ message: string }>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { message: "" },
   });
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const welcomeShownRef = useRef<boolean>(false);
-
+  // mount: wire storage
   useEffect(() => {
-    // client mount
     setIsClient(true);
     setDurations(stored.durations || {});
     setMessages(stored.messages || []);
+    // reload saved convs & profile
+    setSavedConversations(loadSavedConversations());
+    setProfileState(loadProfile());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // persist messages/durations whenever they change
   useEffect(() => {
-    if (isClient) saveMessagesToStorage(messages, durations);
+    if (!isClient) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, durations }));
+    } catch (e) {
+      // ignore
+      // eslint-disable-next-line no-console
+      console.error(e);
+    }
   }, [messages, durations, isClient]);
 
+  // welcome
   useEffect(() => {
     if (isClient && initialMessages.length === 0 && !welcomeShownRef.current) {
       const welcome: UIMessage = {
@@ -140,47 +187,23 @@ export default function ChatPage() {
         parts: [{ type: "text", text: WELCOME_MESSAGE }],
       };
       setMessages([welcome]);
-      saveMessagesToStorage([welcome], {});
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: [welcome], durations: {} }));
       welcomeShownRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isClient]);
 
-  // autoscroll when messages change
+  // autoscroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // durations handler used by MessageWall
   const handleDurationChange = (key: string, duration: number) => {
-    setDurations((prev) => {
-      const next = { ...prev };
-      next[key] = duration;
-      return next;
-    });
+    setDurations((prev) => ({ ...prev, [key]: duration }));
   };
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { message: "" },
-  });
-
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    // set quick UI typing indicator; useChat will handle response streaming
-    setIsTyping(true);
-    sendMessage({ text: data.message });
-    form.reset();
-    // fallback to hide typing if streaming takes long
-    setTimeout(() => setIsTyping(false), 1200);
-  }
-
-  function clearChat() {
-    setMessages([]);
-    setDurations({});
-    saveMessagesToStorage([], {});
-    toast.success("Chat cleared");
-  }
-
-  // A tiny calorie parse (demo only) to power insights
+  // quick calorie parse for Insights demo
   const latestCalories = (() => {
     const txt = messages
       .map((m) => {
@@ -192,10 +215,65 @@ export default function ChatPage() {
     return match ? Number(match[1]) : null;
   })();
 
-  // sample profile (demo)
-  const profile = { calorieGoal: 2200 };
+  // progress for demo
+  const calorieGoal = Number(profile?.calorieGoal) || 2200;
+  const calorieProgress = Math.min(100, calorieGoal ? ((latestCalories || 0) / calorieGoal) * 100 : 0);
 
-  const calorieProgress = Math.min(100, profile.calorieGoal ? ((latestCalories || 0) / profile.calorieGoal) * 100 : 0);
+  /* ---------------- actions: save / load conversations ---------------- */
+
+  function saveCurrentConversation() {
+    // prompt for title
+    const title = window.prompt("Enter a title for this conversation (e.g., 'Weight loss plan - Jan 5')", `Chat ${new Date().toLocaleString()}`);
+    if (!title) return;
+    const conv: SavedConversation = {
+      id: `conv-${Date.now()}`,
+      title,
+      createdAt: new Date().toISOString(),
+      messages: messages,
+    };
+    const next = [conv, ...savedConversations].slice(0, 50);
+    setSavedConversations(next);
+    saveSavedConversations(next);
+    toast.success("Conversation saved");
+  }
+
+  function loadConversation(conv: SavedConversation) {
+    setMessages(conv.messages);
+    // persist to main storage as active chat
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: conv.messages, durations }));
+    toast.success(`Loaded "${conv.title}"`);
+  }
+
+  function deleteConversation(convId: string) {
+    const next = savedConversations.filter((c) => c.id !== convId);
+    setSavedConversations(next);
+    saveSavedConversations(next);
+    toast.success("Removed conversation");
+  }
+
+  function clearChat() {
+    setMessages([]);
+    setDurations({});
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: [], durations: {} }));
+    } catch {}
+    toast.success("Chat cleared");
+  }
+
+  function onSubmit(data: { message: string }) {
+    setIsTyping(true);
+    sendMessage({ text: data.message });
+    form.reset();
+    setTimeout(() => setIsTyping(false), 1000);
+  }
+
+  // profile editing (inline)
+  function updateProfile(updates: Partial<any>) {
+    const next = { ...profile, ...updates };
+    setProfileState(next);
+    saveProfile(next);
+    toast.success("Profile updated");
+  }
 
   const quickPrompts = [
     "Create a 1800 kcal vegetarian day plan",
@@ -203,57 +281,142 @@ export default function ChatPage() {
     "Count calories: 1 bowl rice, dal, salad",
   ];
 
-  return (
-    <div className="min-h-screen bg-white font-sans antialiased">
-      <main className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
-        {/* left small nav (optional) */}
-        <nav className="col-span-1 hidden lg:flex flex-col items-center gap-4 pt-6">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-slate-100 flex items-center justify-center">🥗</div>
-          <div className="mt-auto text-xs text-slate-400">v1.0</div>
-        </nav>
+  /* ---------------- UI (background pattern + panels) ---------------- */
 
-        {/* center chat */}
-        <section className="col-span-12 lg:col-span-7 flex flex-col gap-5">
+  return (
+    <div
+      // patterned background — light subtle SVG repeated via CSS background-image inline
+      style={{
+        backgroundImage:
+          `radial-gradient(circle at 1px 1px, rgba(34,197,94,0.03) 0.5px, transparent 0.5px)`,
+        backgroundSize: "10px 10px",
+      }}
+      className="min-h-screen font-sans antialiased"
+    >
+      <main className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
+        {/* LEFT: profile + saved chats (panel) */}
+        <aside className="col-span-12 lg:col-span-3 flex flex-col gap-4">
+          {/* Personal data card */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-xl">🥗</div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">Personal data</div>
+                  <div className="text-xs text-slate-500">Editable — saved locally</div>
+                </div>
+              </div>
+              <div>
+                <Button variant="outline" size="sm" onClick={() => { document.getElementById("profile-name")?.focus(); }}>
+                  Edit
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-2 text-sm">
+              <label className="flex flex-col">
+                <span className="text-xs text-slate-500">Name</span>
+                <input id="profile-name" value={profile.name || ""} onChange={(e) => updateProfile({ name: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+              </label>
+
+              <div className="grid grid-cols-3 gap-2">
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Age</span>
+                  <input value={profile.age || ""} onChange={(e) => updateProfile({ age: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                </label>
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Height (cm)</span>
+                  <input value={profile.heightCm || ""} onChange={(e) => updateProfile({ heightCm: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                </label>
+                <label className="flex flex-col text-xs">
+                  <span className="text-slate-500">Weight (kg)</span>
+                  <input value={profile.weightKg || ""} onChange={(e) => updateProfile({ weightKg: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                </label>
+              </div>
+
+              <label className="flex flex-col text-xs">
+                <span className="text-slate-500">Activity level</span>
+                <select value={profile.activity || "Moderate"} onChange={(e) => updateProfile({ activity: e.target.value })} className="mt-1 p-2 rounded border border-slate-100">
+                  <option>Sedentary</option>
+                  <option>Light</option>
+                  <option>Moderate</option>
+                  <option>Active</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {/* Saved conversations list */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex-1 overflow-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold text-slate-800">Past chats</div>
+              <div className="text-xs text-slate-500">{savedConversations.length} saved</div>
+            </div>
+
+            {savedConversations.length === 0 ? (
+              <div className="text-xs text-slate-500">No saved conversations yet. Use "Save" in the chat header.</div>
+            ) : (
+              <ul className="space-y-2">
+                {savedConversations.map((c) => (
+                  <li key={c.id} className="p-2 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-between">
+                    <div>
+                      <button onClick={() => loadConversation(c)} className="text-sm font-medium text-slate-800 text-left">
+                        {c.title}
+                      </button>
+                      <div className="text-xs text-slate-500">{dateFmt(c.createdAt)}</div>
+                    </div>
+                    <div className="flex flex-col gap-1 items-end">
+                      <button onClick={() => loadConversation(c)} className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Open</button>
+                      <button onClick={() => deleteConversation(c.id)} className="text-xs text-red-500 mt-1">Delete</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+        {/* CENTER: chat area */}
+        <section className="col-span-12 lg:col-span-6 flex flex-col gap-4">
           {/* top hero */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-2xl">🥗</div>
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl">🥗</div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-800">NutriBuddy</h2>
-                <p className="text-sm text-slate-500">Smart nutrition assistant</p>
+                <h1 className="text-xl font-semibold text-slate-800">NutriBuddy</h1>
+                <p className="text-xs text-slate-500">Smart Nutrition Chat — personalized to you</p>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={saveCurrentConversation}><PlusIcon className="size-4 mr-1" />Save</Button>
               <Button variant="outline" size="sm" onClick={clearChat}><Eraser className="size-4 mr-1" />Clear</Button>
-              <Button size="sm" onClick={() => toast.success("Saved (demo)")}>Save</Button>
             </div>
           </div>
 
           {/* chat card with internal scroll + sticky composer */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 flex flex-col h-[72vh] overflow-hidden">
-            {/* header */}
+            {/* header inside */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <Avatar>
-                    <AvatarImage src="/logo.png" />
-                    <AvatarFallback>NB</AvatarFallback>
-                  </Avatar>
-                </div>
+                <Avatar>
+                  <AvatarImage src="/logo.png" />
+                  <AvatarFallback>NB</AvatarFallback>
+                </Avatar>
                 <div>
                   <div className="text-sm font-medium text-slate-800">Conversation</div>
                   <div className="text-xs text-slate-500">Chat with {AI_NAME}</div>
                 </div>
               </div>
+
               <div className="text-xs text-slate-500">Status: {status}</div>
             </div>
 
-            {/* messages: scroll inside this area */}
+            {/* messages: scroll inside */}
             <div className="flex-1 overflow-y-auto px-4 py-5">
               <div className="max-w-3xl mx-auto flex flex-col gap-4">
                 <MessageWall messages={messages} status={status} durations={durations} onDurationChange={handleDurationChange} />
 
-                {/* typing indicator */}
                 {isTyping && (
                   <div className="flex items-center gap-3 text-sm text-slate-500">
                     <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">AI</div>
@@ -265,7 +428,7 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* sticky composer */}
+            {/* composer */}
             <div className="sticky bottom-0 bg-white px-4 py-4 border-t border-slate-100">
               <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl mx-auto">
                 <FieldGroup>
@@ -276,7 +439,7 @@ export default function ChatPage() {
                       <Field className="flex items-center gap-3">
                         <Input
                           {...field}
-                          placeholder="Type something like: 'Build me a 1500 kcal vegetarian dinner'"
+                          placeholder="Type: 'Build me a 1500 kcal vegetarian dinner'"
                           className="flex-1 h-14 rounded-full border border-slate-200 shadow-sm px-5"
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
@@ -322,17 +485,17 @@ export default function ChatPage() {
           </div>
         </section>
 
-        {/* right insights */}
-        <aside className="col-span-12 lg:col-span-4 flex flex-col gap-5">
+        {/* RIGHT: Insights */}
+        <aside className="col-span-12 lg:col-span-3 flex flex-col gap-5">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
             <h3 className="text-sm font-semibold text-slate-800">Today's snapshot</h3>
             <p className="text-xs text-slate-500 mt-1">Calories & macros</p>
 
             <div className="mt-4 flex items-center gap-4">
-              <ProgressRing size={104} stroke={10} progress={calorieProgress} />
+              <ProgressRing size={96} stroke={10} progress={calorieProgress} />
               <div className="flex-1">
                 <div className="text-sm font-semibold text-slate-800">{latestCalories ? `${latestCalories} kcal logged` : "No calories logged"}</div>
-                <div className="text-xs text-slate-500 mt-2">Goal: {profile.calorieGoal || 2200} kcal</div>
+                <div className="text-xs text-slate-500 mt-2">Goal: {calorieGoal} kcal</div>
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <div className="text-center">
