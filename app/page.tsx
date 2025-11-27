@@ -28,119 +28,212 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-/* ---------------- constants + storage keys ---------------- */
-
-const STORAGE_KEY = "chat-messages"; // existing messages storage
-const SAVED_CONVS_KEY = "nutribuddy-saved-convs"; // saved conversations (history)
+/* ---------------- storage keys + types ---------------- */
+const STORAGE_KEY = "chat-messages";
+const SAVED_CONVS_KEY = "nutribuddy-saved-convs";
 const PROFILE_KEY = "nutribuddy-profile";
+const TODAY_LOG_KEY = "nutribuddy-today-log";
+const GOALS_KEY = "nutribuddy-goals";
 
 const formSchema = z.object({
   message: z.string().min(1).max(2000),
 });
 
-/* ---------------- small helper types ---------------- */
-
-type SavedConversation = {
-  id: string;
-  title: string;
-  createdAt: string; // ISO
-  messages: UIMessage[];
+type TodayLog = {
+  dateIso: string; // date key e.g. 2025-11-27
+  kcal: number;
+  protein: number; // grams
+  carbs: number; // grams
+  fat: number; // grams
 };
 
-/* ---------------- tiny helpers ---------------- */
-
-const dateFmt = (iso?: string) =>
-  iso ? new Date(iso).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-
-const loadSavedConversations = (): SavedConversation[] => {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(SAVED_CONVS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as SavedConversation[];
-  } catch {
-    return [];
-  }
+type Goals = {
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
 };
 
-const saveSavedConversations = (convs: SavedConversation[]) => {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(SAVED_CONVS_KEY, JSON.stringify(convs));
-};
+/* ---------------- helpers: BMI/BMR & default goals ---------------- */
 
-const loadProfile = () => {
-  if (typeof window === "undefined") return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
-    return JSON.parse(raw);
-  } catch {
-    return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
-  }
-};
-
-const saveProfile = (p: any) => {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
-};
-
-/* ---------------- small UI helper - ProgressRing ---------------- */
-
-function ProgressRing({ size = 96, stroke = 10, progress = 0 }: { size?: number; stroke?: number; progress: number }) {
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (progress / 100) * circumference;
-  return (
-    <svg width={size} height={size} className="block">
-      <defs>
-        <linearGradient id="nutri-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#34D399" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-      </defs>
-      <g transform={`translate(${size / 2}, ${size / 2})`}>
-        <circle r={radius} fill="transparent" stroke="#EEF6F0" strokeWidth={stroke} />
-        <circle
-          r={radius}
-          fill="transparent"
-          stroke="url(#nutri-gradient)"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={offset}
-          transform="rotate(-90)"
-        />
-        <text textAnchor="middle" dy="6" style={{ fontSize: 14, fontWeight: 600, fill: "#065F46" }}>
-          {Math.round(progress)}%
-        </text>
-      </g>
-    </svg>
-  );
+function computeBMI(weightKg: number, heightCm: number) {
+  if (!weightKg || !heightCm) return null;
+  const h = heightCm / 100;
+  return +(weightKg / (h * h)).toFixed(1);
 }
 
-/* ---------------- MAIN PAGE (drop-in) ---------------- */
+// Mifflin-St Jeor BMR (male/female not provided; we will just estimate gender-neutral)
+function computeBMR(weightKg: number, heightCm: number, age: number) {
+  // use average factor (male formula slightly higher). We'll use male formula for a simple estimate:
+  if (!weightKg || !heightCm || !age) return null;
+  // Mifflin St-Jeor (male)
+  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+  return Math.round(bmr);
+}
+
+function activityMultiplier(activity: string) {
+  switch ((activity || "").toLowerCase()) {
+    case "sedentary":
+      return 1.2;
+    case "light":
+      return 1.375;
+    case "moderate":
+      return 1.55;
+    case "active":
+      return 1.725;
+    default:
+      return 1.55;
+  }
+}
+
+// Estimate default macro grams from calorie goal (protein set by 1.6g/kg if weight exists)
+function estimateGoalsFromProfile(profile: any): Goals {
+  const weight = Number(profile.weightKg) || null;
+  const height = Number(profile.heightCm) || null;
+  const age = Number(profile.age) || 30;
+  const activity = profile.activity || "Moderate";
+  const bmr = computeBMR(weight || 70, height || 170, age);
+  const kcal = Math.round((bmr || 1500) * activityMultiplier(activity));
+  // protein grams: 1.6 g per kg of bodyweight default
+  const proteinG = weight ? Math.round(weight * 1.6) : Math.round((kcal * 0.25) / 4);
+  // fat calories ~ 25% of kcal -> grams = (kcal*0.25)/9
+  const fatG = Math.round((kcal * 0.25) / 9);
+  // carbs fill remainder calories
+  const remainingCalories = kcal - proteinG * 4 - fatG * 9;
+  const carbsG = remainingCalories > 0 ? Math.round(remainingCalories / 4) : Math.round((kcal * 0.45) / 4);
+
+  return {
+    kcal,
+    proteinG,
+    carbsG,
+    fatG,
+  };
+}
+
+/* ---------------- small UI helpers ---------------- */
+
+function formatNumber(n: number) {
+  if (!n && n !== 0) return "—";
+  return Math.round(n).toString();
+}
+
+function clamp(n: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, n));
+}
+
+/* ---------------- parse nutrients from text ----------------
+  Accepts text like:
+   "Grilled paneer bowl — 420 kcal, 30g protein, 40g carbs, 10g fat"
+  or "420 kcal" or "30g protein" etc.
+  Returns an object with kcal, protein, carbs, fat (all numbers, may be null).
+*/
+function parseNutrientsFromText(text: string) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+
+  const kcalMatch = lower.match(/(\d{2,5})\s?kcal/);
+  const proteinMatch = lower.match(/(\d{1,4})\s?g\s?(?:protein)?/);
+  const carbsMatch = lower.match(/(\d{1,4})\s?g\s?(?:carb|carbohydrate|carbs)?/);
+  const fatMatch = lower.match(/(\d{1,4})\s?g\s?(?:fat)?/);
+
+  const kcal = kcalMatch ? Number(kcalMatch[1]) : null;
+  const protein = proteinMatch ? Number(proteinMatch[1]) : null;
+  const carbs = carbsMatch ? Number(carbsMatch[1]) : null;
+  const fat = fatMatch ? Number(fatMatch[1]) : null;
+
+  return { kcal, protein, carbs, fat };
+}
+
+/* ---------------- localStorage helpers for Today log & goals --------------- */
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+function loadTodayLog(): TodayLog {
+  try {
+    const raw = localStorage.getItem(TODAY_LOG_KEY);
+    if (!raw) {
+      return { dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    }
+    const parsed = JSON.parse(raw) as TodayLog;
+    if (parsed.dateIso !== todayIso()) {
+      // reset for new day
+      return { dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    }
+    return parsed;
+  } catch {
+    return { dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  }
+}
+
+function saveTodayLog(log: TodayLog) {
+  localStorage.setItem(TODAY_LOG_KEY, JSON.stringify(log));
+}
+
+function loadGoals(): Goals | null {
+  try {
+    const raw = localStorage.getItem(GOALS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Goals;
+  } catch {
+    return null;
+  }
+}
+function saveGoals(g: Goals) {
+  localStorage.setItem(GOALS_KEY, JSON.stringify(g));
+}
+
+/* ---------------- Main Page Component (drop-in) ---------------- */
 
 export default function ChatPage() {
-  // client flags & storage
+  // initial storage & client flag
   const [isClient, setIsClient] = useState(false);
-  const stored = typeof window !== "undefined" ? (() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { messages: [], durations: {} };
-      const parsed = JSON.parse(raw);
-      return { messages: parsed.messages || [], durations: parsed.durations || {} };
-    } catch {
-      return { messages: [], durations: {} };
-    }
-  })() : { messages: [], durations: {} };
+
+  // load existing stored chat messages (keeps app behavior)
+  const stored = typeof window !== "undefined"
+    ? (() => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return { messages: [], durations: {} };
+          const parsed = JSON.parse(raw);
+          return { messages: parsed.messages || [], durations: parsed.durations || {} };
+        } catch {
+          return { messages: [], durations: {} };
+        }
+      })()
+    : { messages: [], durations: {} };
 
   const [initialMessages] = useState<UIMessage[]>(stored.messages || []);
   const [durations, setDurations] = useState<Record<string, number>>(stored.durations || {});
   const [isTyping, setIsTyping] = useState(false);
 
   // saved conversations & profile
-  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() => loadSavedConversations());
-  const [profile, setProfileState] = useState(() => loadProfile());
+  const [savedConversations, setSavedConversations] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_CONVS_KEY);
+      return raw ? (JSON.parse(raw) as any[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [profile, setProfile] = useState(() => {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      return raw ? JSON.parse(raw) : { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
+    } catch {
+      return { name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" };
+    }
+  });
+
+  // inferred/default goals (can be overridden by user)
+  const [goals, setGoals] = useState<Goals>(() => {
+    const loaded = loadGoals();
+    if (loaded) return loaded;
+    return estimateGoalsFromProfile(profile);
+  });
+
+  // today's log
+  const [todayLog, setTodayLog] = useState<TodayLog>(() => loadTodayLog());
 
   // chat hook
   const { messages, sendMessage, status, stop, setMessages } = useChat({ messages: initialMessages });
@@ -149,97 +242,64 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const welcomeShownRef = useRef(false);
 
-  // form
+  // react-hook-form
   const form = useForm<{ message: string }>({
     resolver: zodResolver(formSchema),
     defaultValues: { message: "" },
   });
 
-  // mount: wire storage
+  // mount
   useEffect(() => {
     setIsClient(true);
     setDurations(stored.durations || {});
     setMessages(stored.messages || []);
-    // reload saved convs & profile
-    setSavedConversations(loadSavedConversations());
-    setProfileState(loadProfile());
+    // sync saved convs/profile/goals/todayLog from localStorage
+    try {
+      const rawConvs = localStorage.getItem(SAVED_CONVS_KEY);
+      if (rawConvs) setSavedConversations(JSON.parse(rawConvs));
+    } catch {}
+    try {
+      const rawProfile = localStorage.getItem(PROFILE_KEY);
+      if (rawProfile) setProfile(JSON.parse(rawProfile));
+    } catch {}
+    const loadedGoals = loadGoals();
+    if (loadedGoals) setGoals(loadedGoals);
+    setTodayLog(loadTodayLog());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // persist messages/durations whenever they change
+  // persist messages/durations
   useEffect(() => {
     if (!isClient) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, durations }));
-    } catch (e) {
-      // ignore
-      // eslint-disable-next-line no-console
-      console.error(e);
-    }
+    } catch {}
   }, [messages, durations, isClient]);
-
-  // welcome
-  useEffect(() => {
-    if (isClient && initialMessages.length === 0 && !welcomeShownRef.current) {
-      const welcome: UIMessage = {
-        id: `welcome-${Date.now()}`,
-        role: "assistant",
-        parts: [{ type: "text", text: WELCOME_MESSAGE }],
-      };
-      setMessages([welcome]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: [welcome], durations: {} }));
-      welcomeShownRef.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient]);
 
   // autoscroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // durations handler used by MessageWall
+  // handlers for MessageWall durations
   const handleDurationChange = (key: string, duration: number) => {
     setDurations((prev) => ({ ...prev, [key]: duration }));
   };
 
-  // quick calorie parse for Insights demo
-  const latestCalories = (() => {
-    const txt = messages
-      .map((m) => {
-        if (m.parts && m.parts.length) return m.parts.map((p: any) => p.text).join(" ");
-        return (m as any).text || "";
-      })
-      .join(" ");
-    const match = txt.match(/(\d{2,4})\s?k?c?a?l?/i);
-    return match ? Number(match[1]) : null;
-  })();
-
-  // progress for demo
-  const calorieGoal = Number(profile?.calorieGoal) || 2200;
-  const calorieProgress = Math.min(100, calorieGoal ? ((latestCalories || 0) / calorieGoal) * 100 : 0);
-
-  /* ---------------- actions: save / load conversations ---------------- */
+  /* ------------------ Actions: save / load convs ------------------ */
 
   function saveCurrentConversation() {
-    // prompt for title
-    const title = window.prompt("Enter a title for this conversation (e.g., 'Weight loss plan - Jan 5')", `Chat ${new Date().toLocaleString()}`);
+    const title = window.prompt("Enter a title for this conversation", `Chat ${new Date().toLocaleString()}`);
     if (!title) return;
-    const conv: SavedConversation = {
-      id: `conv-${Date.now()}`,
-      title,
-      createdAt: new Date().toISOString(),
-      messages: messages,
-    };
+    const conv = { id: `conv-${Date.now()}`, title, createdAt: new Date().toISOString(), messages: messages || [] };
     const next = [conv, ...savedConversations].slice(0, 50);
     setSavedConversations(next);
-    saveSavedConversations(next);
+    localStorage.setItem(SAVED_CONVS_KEY, JSON.stringify(next));
     toast.success("Conversation saved");
   }
 
-  function loadConversation(conv: SavedConversation) {
+  function loadConversation(conv: any) {
     setMessages(conv.messages);
-    // persist to main storage as active chat
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: conv.messages, durations }));
     toast.success(`Loaded "${conv.title}"`);
   }
@@ -247,106 +307,203 @@ export default function ChatPage() {
   function deleteConversation(convId: string) {
     const next = savedConversations.filter((c) => c.id !== convId);
     setSavedConversations(next);
-    saveSavedConversations(next);
+    localStorage.setItem(SAVED_CONVS_KEY, JSON.stringify(next));
     toast.success("Removed conversation");
   }
 
   function clearChat() {
     setMessages([]);
     setDurations({});
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: [], durations: {} }));
-    } catch {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: [], durations: {} }));
     toast.success("Chat cleared");
   }
 
-  function onSubmit(data: { message: string }) {
-    setIsTyping(true);
-    sendMessage({ text: data.message });
-    form.reset();
-    setTimeout(() => setIsTyping(false), 1000);
+  /* ------------------ Nutrient log management ------------------ */
+
+  function persistTodayLog(next: TodayLog) {
+    setTodayLog(next);
+    saveTodayLog(next);
   }
 
-  // profile editing (inline)
-  function updateProfile(updates: Partial<any>) {
-    const next = { ...profile, ...updates };
-    setProfileState(next);
-    saveProfile(next);
-    toast.success("Profile updated");
+  // Add nutrients to today's log (numbers are grams or kcal)
+  function addToTodayLog({ kcal = 0, protein = 0, carbs = 0, fat = 0 }: { kcal?: number; protein?: number; carbs?: number; fat?: number }) {
+    const next: TodayLog = {
+      dateIso: todayIso(),
+      kcal: Math.round((todayLog.kcal || 0) + (kcal || 0)),
+      protein: Math.round((todayLog.protein || 0) + (protein || 0)),
+      carbs: Math.round((todayLog.carbs || 0) + (carbs || 0)),
+      fat: Math.round((todayLog.fat || 0) + (fat || 0)),
+    };
+    persistTodayLog(next);
+    toast.success("Added to today's log");
   }
 
-  const quickPrompts = [
-    "Create a 1800 kcal vegetarian day plan",
-    "High-protein snack ideas",
-    "Count calories: 1 bowl rice, dal, salad",
-  ];
+  // High-level parse and add: parse text, estimate macros if missing using goals ratio
+  function parseAndAddFromText(text: string) {
+    if (!text) {
+      toast.error("No text provided");
+      return;
+    }
+    const parsed = parseNutrientsFromText(text);
+    if (!parsed) {
+      toast.error("Could not parse nutrients from text");
+      return;
+    }
 
-  /* ---------------- UI (background pattern + panels) ---------------- */
+    let { kcal, protein, carbs, fat } = parsed;
+
+    // If only kcal found and no macros, estimate macros by goals ratio
+    if (kcal && (!protein && !carbs && !fat)) {
+      // use goals to derive percentages
+      const totalGoalCals = goals.kcal || 2000;
+      const proteinCals = (goals.proteinG || 0) * 4;
+      const fatCals = (goals.fatG || 0) * 9;
+      const carbsCals = totalGoalCals - proteinCals - fatCals;
+      const pRatio = proteinCals / totalGoalCals;
+      const fRatio = fatCals / totalGoalCals;
+      const cRatio = carbsCals / totalGoalCals;
+
+      protein = Math.round((kcal * pRatio) / 4);
+      fat = Math.round((kcal * fRatio) / 9);
+      carbs = Math.round((kcal * cRatio) / 4);
+    } else {
+      // if kcal missing but macros present, compute kcal
+      if (!kcal) kcal = (protein || 0) * 4 + (carbs || 0) * 4 + (fat || 0) * 9;
+      // if some macros missing, estimate from remaining calories using goals ratio
+      const missingProtein = protein == null;
+      const missingCarbs = carbs == null;
+      const missingFat = fat == null;
+      if (kcal && (missingProtein || missingCarbs || missingFat)) {
+        // compute used calories from known macros
+        const used = (protein || 0) * 4 + (carbs || 0) * 4 + (fat || 0) * 9;
+        const remainingCals = Math.max(0, (kcal || 0) - used);
+        // distribute remaining calories according to goals proportions of the remaining macros
+        const goalProteinCals = (goals.proteinG || 0) * 4;
+        const goalCarbCals = (goals.carbsG || 0) * 4;
+        const goalFatCals = (goals.fatG || 0) * 9;
+        const goalSum = goalProteinCals + goalCarbCals + goalFatCals;
+        if (goalSum > 0) {
+          const pShare = missingProtein ? goalProteinCals / goalSum : 0;
+          const cShare = missingCarbs ? goalCarbCals / goalSum : 0;
+          const fShare = missingFat ? goalFatCals / goalSum : 0;
+          if (missingProtein) protein = Math.round((remainingCals * pShare) / 4);
+          if (missingCarbs) carbs = Math.round((remainingCals * cShare) / 4);
+          if (missingFat) fat = Math.round((remainingCals * fShare) / 9);
+        }
+      }
+    }
+
+    // final normalization to numbers
+    kcal = kcal ? Math.round(kcal) : 0;
+    protein = protein ? Math.round(protein) : 0;
+    carbs = carbs ? Math.round(carbs) : 0;
+    fat = fat ? Math.round(fat) : 0;
+
+    addToTodayLog({ kcal, protein, carbs, fat });
+  }
+
+  // Add composer content or last assistant message
+  function addComposerToLog() {
+    const txt = (form.getValues()?.message || "").trim();
+    if (!txt) return toast.error("Composer is empty");
+    parseAndAddFromText(txt);
+  }
+  function addLastAssistantMessageToLog() {
+    const assistantMsgs = (messages || []).filter((m) => m.role === "assistant");
+    if (!assistantMsgs || assistantMsgs.length === 0) return toast.error("No assistant messages found");
+    const last = assistantMsgs[assistantMsgs.length - 1];
+    const text = last.parts?.map((p: any) => p.text).join(" ") || (last as any).text || "";
+    parseAndAddFromText(text);
+  }
+
+  /* ---------------- UI: interactive progress bar component ---------------- */
+  function ProgressBar({ value, target, color = "#34D399" }: { value: number; target: number; color?: string }) {
+    const pct = target > 0 ? clamp((value / target) * 100, 0, 200) : 0;
+    return (
+      <div>
+        <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
+          <div>{formatNumber(value)}</div>
+          <div>{formatNumber(target)}</div>
+        </div>
+        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div style={{ width: `${pct}%`, background: color, height: "100%", transition: "width 500ms ease" }} />
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------------- UI render ---------------- */
 
   return (
     <div
-      // patterned background — light subtle SVG repeated via CSS background-image inline
       style={{
-        backgroundImage:
-          `radial-gradient(circle at 1px 1px, rgba(34,197,94,0.03) 0.5px, transparent 0.5px)`,
+        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(34,197,94,0.02) 0.6px, transparent 0.6px)`,
         backgroundSize: "10px 10px",
       }}
       className="min-h-screen font-sans antialiased"
     >
       <main className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
-        {/* LEFT: profile + saved chats (panel) */}
+        {/* LEFT: profile + saved chats */}
         <aside className="col-span-12 lg:col-span-3 flex flex-col gap-4">
-          {/* Personal data card */}
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-xl">🥗</div>
                 <div>
                   <div className="text-sm font-semibold text-slate-800">Personal data</div>
-                  <div className="text-xs text-slate-500">Editable — saved locally</div>
+                  <div className="text-xs text-slate-500">Saved locally</div>
                 </div>
               </div>
               <div>
-                <Button variant="outline" size="sm" onClick={() => { document.getElementById("profile-name")?.focus(); }}>
-                  Edit
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => { document.getElementById("profile-name")?.focus(); }}>Edit</Button>
               </div>
             </div>
 
             <div className="mt-3 space-y-2 text-sm">
               <label className="flex flex-col">
                 <span className="text-xs text-slate-500">Name</span>
-                <input id="profile-name" value={profile.name || ""} onChange={(e) => updateProfile({ name: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                <input id="profile-name" value={profile.name || ""} onChange={(e) => { const next = { ...profile, name: e.target.value }; setProfile(next); localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); }} className="mt-1 p-2 rounded border border-slate-100" />
               </label>
 
               <div className="grid grid-cols-3 gap-2">
                 <label className="flex flex-col text-xs">
                   <span className="text-slate-500">Age</span>
-                  <input value={profile.age || ""} onChange={(e) => updateProfile({ age: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                  <input value={profile.age || ""} onChange={(e) => { const next = { ...profile, age: e.target.value }; setProfile(next); localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); }} className="mt-1 p-2 rounded border border-slate-100" />
                 </label>
                 <label className="flex flex-col text-xs">
                   <span className="text-slate-500">Height (cm)</span>
-                  <input value={profile.heightCm || ""} onChange={(e) => updateProfile({ heightCm: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                  <input value={profile.heightCm || ""} onChange={(e) => { const next = { ...profile, heightCm: e.target.value }; setProfile(next); localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); }} className="mt-1 p-2 rounded border border-slate-100" />
                 </label>
                 <label className="flex flex-col text-xs">
                   <span className="text-slate-500">Weight (kg)</span>
-                  <input value={profile.weightKg || ""} onChange={(e) => updateProfile({ weightKg: e.target.value })} className="mt-1 p-2 rounded border border-slate-100" />
+                  <input value={profile.weightKg || ""} onChange={(e) => { const next = { ...profile, weightKg: e.target.value }; setProfile(next); localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); }} className="mt-1 p-2 rounded border border-slate-100" />
                 </label>
               </div>
 
               <label className="flex flex-col text-xs">
                 <span className="text-slate-500">Activity level</span>
-                <select value={profile.activity || "Moderate"} onChange={(e) => updateProfile({ activity: e.target.value })} className="mt-1 p-2 rounded border border-slate-100">
+                <select value={profile.activity || "Moderate"} onChange={(e) => { const next = { ...profile, activity: e.target.value }; setProfile(next); localStorage.setItem(PROFILE_KEY, JSON.stringify(next)); }} className="mt-1 p-2 rounded border border-slate-100">
                   <option>Sedentary</option>
                   <option>Light</option>
                   <option>Moderate</option>
                   <option>Active</option>
                 </select>
               </label>
+
+              {/* Recompute default goals from profile */}
+              <div className="flex items-center gap-2 mt-2">
+                <Button size="sm" variant="outline" onClick={() => {
+                  const est = estimateGoalsFromProfile(profile);
+                  setGoals(est);
+                  saveGoals(est);
+                  toast.success("Goals estimated from profile");
+                }}>Estimate goals</Button>
+                <Button size="sm" onClick={() => { setProfile({ name: "", age: "", heightCm: "", weightKg: "", activity: "Moderate" }); localStorage.removeItem(PROFILE_KEY); toast.success("Profile cleared"); }}>Reset</Button>
+              </div>
             </div>
           </div>
 
-          {/* Saved conversations list */}
+          {/* saved conversations */}
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex-1 overflow-auto">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold text-slate-800">Past chats</div>
@@ -354,15 +511,13 @@ export default function ChatPage() {
             </div>
 
             {savedConversations.length === 0 ? (
-              <div className="text-xs text-slate-500">No saved conversations yet. Use "Save" in the chat header.</div>
+              <div className="text-xs text-slate-500">No saved conversations. Use Save in the header.</div>
             ) : (
               <ul className="space-y-2">
-                {savedConversations.map((c) => (
+                {savedConversations.map((c: any) => (
                   <li key={c.id} className="p-2 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-between">
                     <div>
-                      <button onClick={() => loadConversation(c)} className="text-sm font-medium text-slate-800 text-left">
-                        {c.title}
-                      </button>
+                      <button onClick={() => loadConversation(c)} className="text-sm font-medium text-slate-800 text-left">{c.title}</button>
                       <div className="text-xs text-slate-500">{dateFmt(c.createdAt)}</div>
                     </div>
                     <div className="flex flex-col gap-1 items-end">
@@ -376,15 +531,14 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        {/* CENTER: chat area */}
+        {/* CENTER: chat */}
         <section className="col-span-12 lg:col-span-6 flex flex-col gap-4">
-          {/* top hero */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl">🥗</div>
               <div>
                 <h1 className="text-xl font-semibold text-slate-800">NutriBuddy</h1>
-                <p className="text-xs text-slate-500">Smart Nutrition Chat — personalized to you</p>
+                <p className="text-xs text-slate-500">Personalised nutrition chat</p>
               </div>
             </div>
 
@@ -394,9 +548,7 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* chat card with internal scroll + sticky composer */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 flex flex-col h-[72vh] overflow-hidden">
-            {/* header inside */}
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar>
@@ -408,11 +560,9 @@ export default function ChatPage() {
                   <div className="text-xs text-slate-500">Chat with {AI_NAME}</div>
                 </div>
               </div>
-
               <div className="text-xs text-slate-500">Status: {status}</div>
             </div>
 
-            {/* messages: scroll inside */}
             <div className="flex-1 overflow-y-auto px-4 py-5">
               <div className="max-w-3xl mx-auto flex flex-col gap-4">
                 <MessageWall messages={messages} status={status} durations={durations} onDurationChange={handleDurationChange} />
@@ -428,26 +578,20 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* composer */}
             <div className="sticky bottom-0 bg-white px-4 py-4 border-t border-slate-100">
-              <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl mx-auto">
+              <form onSubmit={form.handleSubmit((d) => { setIsTyping(true); sendMessage({ text: d.message }); form.reset(); setTimeout(() => setIsTyping(false), 1000); })} className="max-w-3xl mx-auto">
                 <FieldGroup>
                   <Controller
                     name="message"
                     control={form.control}
                     render={({ field }) => (
                       <Field className="flex items-center gap-3">
-                        <Input
-                          {...field}
-                          placeholder="Type: 'Build me a 1500 kcal vegetarian dinner'"
-                          className="flex-1 h-14 rounded-full border border-slate-200 shadow-sm px-5"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              form.handleSubmit(onSubmit)();
-                            }
-                          }}
-                        />
+                        <Input {...field} placeholder="Type: 'Grilled paneer bowl — 420 kcal, 30g protein, 40g carbs, 10g fat'" className="flex-1 h-14 rounded-full border border-slate-200 shadow-sm px-5" onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            form.handleSubmit(onSubmit)();
+                          }
+                        }} />
 
                         {(status === "ready" || status === "error") && (
                           <Button type="submit" size="icon" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md" disabled={!field.value.trim()}>
@@ -466,17 +610,9 @@ export default function ChatPage() {
                 </FieldGroup>
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {quickPrompts.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        form.setValue("message", q);
-                        toast.success("Prompt loaded — press Enter to send");
-                      }}
-                      className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm hover:bg-emerald-100 transition"
-                    >
-                      {q}
+                  {["Meal plan", "Calories", "Recipe", "Veg", "Keto"].map((chip) => (
+                    <button key={chip} type="button" onClick={() => { form.setValue("message", chip); toast.success("Prompt loaded — press Enter to send"); }} className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm hover:bg-emerald-100 transition">
+                      {chip}
                     </button>
                   ))}
                 </div>
@@ -485,63 +621,104 @@ export default function ChatPage() {
           </div>
         </section>
 
-        {/* RIGHT: Insights */}
+        {/* RIGHT: interactive Today's snapshot */}
         <aside className="col-span-12 lg:col-span-3 flex flex-col gap-5">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-800">Today's snapshot</h3>
-            <p className="text-xs text-slate-500 mt-1">Calories & macros</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Today's snapshot</h3>
+                <p className="text-xs text-slate-500 mt-1">Log & targets</p>
+              </div>
+              <div className="text-xs text-slate-400">{todayIso()}</div>
+            </div>
 
             <div className="mt-4 flex items-center gap-4">
-              <ProgressRing size={96} stroke={10} progress={calorieProgress} />
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-slate-800">{latestCalories ? `${latestCalories} kcal logged` : "No calories logged"}</div>
-                <div className="text-xs text-slate-500 mt-2">Goal: {calorieGoal} kcal</div>
+              <div>
+                {/* calories donut - simple svg ring */}
+                <svg width="92" height="92">
+                  <defs>
+                    <linearGradient id="g-c" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#34D399" />
+                      <stop offset="100%" stopColor="#059669" />
+                    </linearGradient>
+                  </defs>
+                  <g transform="translate(46,46)">
+                    <circle r="36" fill="transparent" stroke="#EEF6F0" strokeWidth="12" />
+                    <circle r="36" fill="transparent" stroke="url(#g-c)" strokeWidth="12" strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 36}`} strokeDashoffset={`${2 * Math.PI * 36 * (1 - clamp(todayLog.kcal / goals.kcal, 0, 1))}`} transform="rotate(-90)" />
+                    <text textAnchor="middle" dy="6" style={{ fontSize: 14, fontWeight: 600, fill: "#065F46" }}>{Math.round((todayLog.kcal / (goals.kcal || 1)) * 100)}%</text>
+                  </g>
+                </svg>
+              </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <div className="text-center">
-                    <div className="text-sm font-semibold text-slate-800">Protein</div>
-                    <div className="text-xs text-slate-500">30g</div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-slate-800">{todayLog.kcal} kcal logged</div>
+                <div className="text-xs text-slate-500 mt-1">Goal: {goals.kcal} kcal</div>
+
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">Protein (g)</div>
+                    <ProgressBar value={todayLog.protein} target={goals.proteinG} color="#F97316" />
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-semibold text-slate-800">Carbs</div>
-                    <div className="text-xs text-slate-500">60g</div>
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">Carbs (g)</div>
+                    <ProgressBar value={todayLog.carbs} target={goals.carbsG} color="#60A5FA" />
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-semibold text-slate-800">Fat</div>
-                    <div className="text-xs text-slate-500">20g</div>
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">Fat (g)</div>
+                    <ProgressBar value={todayLog.fat} target={goals.fatG} color="#F472B6" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => toast.success("Exported (demo)")}>Export</Button>
-              <Button size="sm" onClick={() => toast.success("Saved (demo)")}>Save</Button>
+            {/* editable goals */}
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <label className="flex flex-col text-xs">
+                <span className="text-slate-500">Calorie goal</span>
+                <input type="number" value={goals.kcal} onChange={(e) => { const next = { ...goals, kcal: Number(e.target.value) }; setGoals(next); saveGoals(next); }} className="mt-1 p-2 rounded border border-slate-100" />
+              </label>
+              <label className="flex flex-col text-xs">
+                <span className="text-slate-500">Protein (g)</span>
+                <input type="number" value={goals.proteinG} onChange={(e) => { const next = { ...goals, proteinG: Number(e.target.value) }; setGoals(next); saveGoals(next); }} className="mt-1 p-2 rounded border border-slate-100" />
+              </label>
+              <label className="flex flex-col text-xs">
+                <span className="text-slate-500">Carbs (g)</span>
+                <input type="number" value={goals.carbsG} onChange={(e) => { const next = { ...goals, carbsG: Number(e.target.value) }; setGoals(next); saveGoals(next); }} className="mt-1 p-2 rounded border border-slate-100" />
+              </label>
+              <label className="flex flex-col text-xs">
+                <span className="text-slate-500">Fat (g)</span>
+                <input type="number" value={goals.fatG} onChange={(e) => { const next = { ...goals, fatG: Number(e.target.value) }; setGoals(next); saveGoals(next); }} className="mt-1 p-2 rounded border border-slate-100" />
+              </label>
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" onClick={() => { addComposerToLog(); }}>Add composer → Log</Button>
+              <Button size="sm" variant="outline" onClick={() => { addLastAssistantMessageToLog(); }}>Add last assistant → Log</Button>
+              <Button size="sm" variant="ghost" onClick={() => { persistTodayLog({ dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 }); toast.success("Log reset"); }}>Reset</Button>
             </div>
           </div>
 
+          {/* Suggested meals */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
             <h3 className="text-sm font-semibold text-slate-800">Suggested meals</h3>
             <ul className="mt-3 space-y-3">
               {[
-                { title: "Grilled paneer bowl", kcal: 420 },
-                { title: "Quinoa salad with roasted veg", kcal: 350 },
-                { title: "Chickpea curry + brown rice", kcal: 560 },
+                { title: "Grilled paneer bowl", kcal: 420, protein: 30, carbs: 40, fat: 10 },
+                { title: "Quinoa salad with roasted veg", kcal: 350, protein: 12, carbs: 50, fat: 10 },
+                { title: "Chickpea curry + brown rice", kcal: 560, protein: 20, carbs: 80, fat: 12 },
               ].map((m) => (
                 <li key={m.title} className="flex items-center justify-between p-3 rounded-lg bg-white border border-slate-100 shadow-sm">
                   <div>
                     <div className="text-sm font-medium text-slate-800">{m.title}</div>
-                    <div className="text-xs text-slate-500">{m.kcal} kcal</div>
+                    <div className="text-xs text-slate-500">{m.kcal} kcal — {m.protein}g P / {m.carbs}g C / {m.fat}g F</div>
                   </div>
-                  <div>
-                    <button
-                      className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm"
-                      onClick={() => {
-                        form.setValue("message", `Recipe: ${m.title} — portions and calories please.`);
-                        toast.success("Loaded into composer (press Enter)");
-                      }}
-                    >
+                  <div className="flex flex-col items-end gap-2">
+                    <button className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm" onClick={() => { form.setValue("message", `${m.title} — ${m.kcal} kcal, ${m.protein}g protein, ${m.carbs}g carbs, ${m.fat}g fat`); toast.success("Loaded into composer"); }}>
                       Load
+                    </button>
+                    <button className="px-3 py-1 rounded-full bg-emerald-600 text-white text-sm" onClick={() => { addToTodayLog({ kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat }); }}>
+                      Add to today's log
                     </button>
                   </div>
                 </li>
