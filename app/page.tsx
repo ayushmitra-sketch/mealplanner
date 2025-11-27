@@ -418,93 +418,98 @@ export default function ChatPage() {
           </div>
         </section>
 
-        {/* RIGHT column: same visual height as chat to avoid drop */}
+        {/* RIGHT column: Today's snapshot + Suggested meals side-by-side */}
         <aside className="col-span-12 lg:col-span-3 flex flex-col gap-5">
-          <div className="bg-white rounded-xl p-5 shadow border border-slate-100 h-[72vh] overflow-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Today's snapshot</h3>
-                <p className="text-xs text-slate-400">Log & targets</p>
-              </div>
-              <div className="text-xs text-slate-400">{todayIso()}</div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-4">
-              <div>
-                <svg width="84" height="84">
-                  <defs>
-                    <linearGradient id="g-c" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#34D399" />
-                      <stop offset="100%" stopColor="#059669" />
-                    </linearGradient>
-                  </defs>
-                  <g transform="translate(42,42)">
-                    <circle r="32" fill="transparent" stroke="#EEF6F0" strokeWidth="10" />
-                    <circle r="32" fill="transparent" stroke="url(#g-c)" strokeWidth="10" strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 32}`} strokeDashoffset={`${2 * Math.PI * 32 * (1 - clamp(todayLog.kcal / (goals.kcal || 1), 0, 1))}`} transform="rotate(-90)" />
-                    <text textAnchor="middle" dy="6" style={{ fontSize: 12, fontWeight: 700, fill: "#065F46" }}>{Math.round((todayLog.kcal / (goals.kcal || 1)) * 100)}%</text>
-                  </g>
-                </svg>
-              </div>
-
-              <div className="flex-1">
-                <div className="text-sm font-semibold">{todayLog.kcal} kcal logged</div>
-                <div className="text-xs text-slate-400 mt-1">Goal: {goals.kcal}</div>
-
-                <div className="mt-4 space-y-3">
+          <div className="bg-white rounded-xl p-4 shadow border border-slate-100 h-[72vh] overflow-auto">
+            <div className="grid grid-cols-2 gap-4 h-full">
+              {/* left: Today's snapshot */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs text-slate-500 mb-1">Protein (g)</div>
-                    <ProgressBar value={todayLog.protein} target={goals.proteinG} color="#F97316" />
+                    <h3 className="text-sm font-semibold">Today's snapshot</h3>
+                    <p className="text-xs text-slate-400">Log & targets</p>
                   </div>
+                  <div className="text-xs text-slate-400">{todayIso()}</div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
                   <div>
-                    <div className="text-xs text-slate-500 mb-1">Carbs (g)</div>
-                    <ProgressBar value={todayLog.carbs} target={goals.carbsG} color="#60A5FA" />
+                    <svg width="72" height="72">
+                      <defs>
+                        <linearGradient id="g-c-2" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#34D399" />
+                          <stop offset="100%" stopColor="#059669" />
+                        </linearGradient>
+                      </defs>
+                      <g transform="translate(36,36)">
+                        <circle r="28" fill="transparent" stroke="#EEF6F0" strokeWidth="8" />
+                        <circle r="28" fill="transparent" stroke="url(#g-c-2)" strokeWidth="8" strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 28}`} strokeDashoffset={`${2 * Math.PI * 28 * (1 - clamp(todayLog.kcal / (goals.kcal || 1), 0, 1))}`} transform="rotate(-90)" />
+                        <text textAnchor="middle" dy="6" style={{ fontSize: 12, fontWeight: 700, fill: "#065F46" }}>{Math.round((todayLog.kcal / (goals.kcal || 1)) * 100)}%</text>
+                      </g>
+                    </svg>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Fat (g)</div>
-                    <ProgressBar value={todayLog.fat} target={goals.fatG} color="#F472B6" />
+
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">{todayLog.kcal} kcal logged</div>
+                    <div className="text-xs text-slate-400 mt-1">Goal: {goals.kcal}</div>
+
+                    <div className="mt-4 space-y-2">
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1">Protein (g)</div>
+                        <ProgressBar value={todayLog.protein} target={goals.proteinG} color="#F97316" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1">Carbs (g)</div>
+                        <ProgressBar value={todayLog.carbs} target={goals.carbsG} color="#60A5FA" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1">Fat (g)</div>
+                        <ProgressBar value={todayLog.fat} target={goals.fatG} color="#F472B6" />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-              <label className="flex flex-col text-xs"><span className="text-slate-500">Calorie goal</span><input type="number" className="input mt-1" value={goals.kcal ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, kcal: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, kcal: n })); }} /></label>
-              <label className="flex flex-col text-xs"><span className="text-slate-500">Protein (g)</span><input type="number" className="input mt-1" value={goals.proteinG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, proteinG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, proteinG: n })); }} /></label>
-              <label className="flex flex-col text-xs"><span className="text-slate-500">Carbs (g)</span><input type="number" className="input mt-1" value={goals.carbsG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, carbsG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, carbsG: n })); }} /></label>
-              <label className="flex flex-col text-xs"><span className="text-slate-500">Fat (g)</span><input type="number" className="input mt-1" value={goals.fatG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, fatG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, fatG: n })); }} /></label>
-            </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <label className="flex flex-col text-xs"><span className="text-slate-500">Calorie goal</span><input type="number" className="input mt-1" value={goals.kcal ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, kcal: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, kcal: n })); }} /></label>
+                  <label className="flex flex-col text-xs"><span className="text-slate-500">Protein (g)</span><input type="number" className="input mt-1" value={goals.proteinG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, proteinG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, proteinG: n })); }} /></label>
+                  <label className="flex flex-col text-xs"><span className="text-slate-500">Carbs (g)</span><input type="number" className="input mt-1" value={goals.carbsG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, carbsG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, carbsG: n })); }} /></label>
+                  <label className="flex flex-col text-xs"><span className="text-slate-500">Fat (g)</span><input type="number" className="input mt-1" value={goals.fatG ?? ""} onChange={(e) => { const n = e.target.value === "" ? 0 : Number(e.target.value); setGoals({ ...goals, fatG: n }); localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, fatG: n })); }} /></label>
+                </div>
 
-            <div className="mt-3 flex gap-2">
-              <button className="px-3 py-2 rounded-md bg-emerald-700 text-white" onClick={() => addComposerToLog()}>Add composer → Log</button>
-              <button className="px-3 py-2 rounded-md border border-slate-200" onClick={() => addLastAssistantToLog()}>Add last assistant → Log</button>
-              <button className="px-3 py-2 rounded-md text-sm" onClick={() => { const empty = { dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 }; persistToday(empty); toast.success("Reset"); }}>Reset</button>
-            </div>
-
-            {/* Suggested meals */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">Suggested meals</div>
-                <div className="text-xs text-slate-400">Quick add</div>
+                <div className="mt-3 flex gap-2">
+                  <button className="px-3 py-2 rounded-md bg-emerald-700 text-white" onClick={() => addComposerToLog()}>Add composer → Log</button>
+                  <button className="px-3 py-2 rounded-md border border-slate-200" onClick={() => addLastAssistantToLog()}>Add last assistant → Log</button>
+                  <button className="px-3 py-2 rounded-md text-sm" onClick={() => { const empty = { dateIso: todayIso(), kcal: 0, protein: 0, carbs: 0, fat: 0 }; persistToday(empty); toast.success("Reset"); }}>Reset</button>
+                </div>
               </div>
 
-              <div className="mt-3 space-y-3">
-                {suggestedMeals.map((m) => (
-                  <div key={m.title} className="flex items-center justify-between p-3 rounded-md border border-slate-100 bg-white">
-                    <div>
-                      <div className="text-sm font-medium">{m.title}</div>
-                      <div className="text-xs text-slate-400 mt-1">{m.kcal} kcal · {m.protein}g P · {m.carbs}g C</div>
+              {/* right: Suggested meals - compact column */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Suggested meals</div>
+                  <div className="text-xs text-slate-400">Quick add</div>
+                </div>
+
+                <div className="mt-3 space-y-3 flex-1 overflow-auto pr-1">
+                  {suggestedMeals.map((m) => (
+                    <div key={m.title} className="flex items-center justify-between p-2 rounded-md border border-slate-100 bg-white">
+                      <div>
+                        <div className="text-sm font-medium">{m.title}</div>
+                        <div className="text-xs text-slate-400 mt-1">{m.kcal} kcal · {m.protein}g P · {m.carbs}g C</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="px-2 py-1 rounded-md border border-slate-200 text-xs" onClick={() => { form.setValue("message", `${m.title} — ${m.kcal} kcal, ${m.protein}g protein, ${m.carbs}g carbs, ${m.fat}g fat`); toast.success("Loaded into composer"); }}>Load</button>
+                        <button className="px-2 py-1 rounded-md bg-emerald-600 text-white text-xs" onClick={() => addToToday({ kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat })}>Add</button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button className="px-3 py-1 rounded-md border border-slate-200 text-xs" onClick={() => { form.setValue("message", `${m.title} — ${m.kcal} kcal, ${m.protein}g protein, ${m.carbs}g carbs, ${m.fat}g fat`); toast.success("Loaded into composer"); }}>Load</button>
-                      <button className="px-3 py-1 rounded-md bg-emerald-600 text-white text-xs" onClick={() => addToToday({ kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat })}>Add</button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                <div className="mt-3 text-xs text-slate-400">Tip: Load into composer then press Enter to chat about recipe or adjustments.</div>
               </div>
             </div>
-
-            <div className="mt-6 text-xs text-slate-400">© {new Date().getFullYear()} {OWNER_NAME}</div>
           </div>
         </aside>
       </main>
