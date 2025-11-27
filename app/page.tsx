@@ -22,6 +22,7 @@ import { MessageWall } from "@/components/messages/message-wall";
 import { ChatHeader } from "@/app/parts/chat-header";
 import { ChatHeaderBlock } from "@/app/parts/chat-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { UIMessage } from "ai";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -56,7 +57,7 @@ const loadMessagesFromStorage = () => {
   }
 };
 
-const saveMessagesToStorage = (messages: any[], durations: any) => {
+const saveMessagesToStorage = (messages: UIMessage[], durations: any) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, durations }));
 };
@@ -66,19 +67,18 @@ const saveMessagesToStorage = (messages: any[], durations: any) => {
 
 export default function ChatPage() {
   const [isClient, setIsClient] = useState(false);
-  const [durations, setDurations] = useState({});
-  const stored = typeof window !== "undefined" ? loadMessagesFromStorage() : { messages: [], durations: {} };
-  const [initialMessages] = useState(stored.messages);
+  const [durations, setDurations] = useState<Record<string, number>>({});
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
-    messages: initialMessages,
-  });
+  const stored = typeof window !== "undefined" ? loadMessagesFromStorage() : { messages: [], durations: {} };
+  const [initialMessages] = useState<UIMessage[]>(stored.messages);
+
+  const { messages, sendMessage, status, stop, setMessages } = useChat({ messages: initialMessages });
 
   const welcomeMessageShownRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef(null);
 
-  /* -------------------------------- handlers ------------------------------ */
+  /* ---------------- effects ---------------- */
 
   useEffect(() => {
     setIsClient(true);
@@ -87,14 +87,9 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
     if (!isClient) return;
     saveMessagesToStorage(messages, durations);
   }, [messages, durations, isClient]);
-
 
   useEffect(() => {
     if (initialMessages.length === 0 && !welcomeMessageShownRef.current) {
@@ -109,6 +104,11 @@ export default function ChatPage() {
     }
   }, [isClient]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  /* ---------------- form ---------------- */
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -119,7 +119,8 @@ export default function ChatPage() {
     setIsTyping(true);
     sendMessage({ text: data.message });
     form.reset();
-    setTimeout(() => setIsTyping(false), 800);
+
+    setTimeout(() => setIsTyping(false), 850);
   }
 
   function clearChat() {
@@ -137,26 +138,28 @@ export default function ChatPage() {
     "Low-carb dinner options",
   ];
 
-  /* ---------------------------- UI ----------------------------- */
+  /* ---------------- UI ---------------- */
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8] font-sans">
+    <div className="min-h-screen bg-[#F7F7F7] font-sans">
       <main className="max-w-6xl mx-auto grid grid-cols-12 gap-8 px-6 py-8">
 
         {/* ---------------- LEFT SIDEBAR ---------------- */}
         <aside className="hidden md:flex col-span-3 flex-col gap-6">
-          
-          {/* Brand Card (Apple-like minimalism) */}
-          <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-slate-200">
+
+          {/* Brand Card */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-2xl">
                 🥗
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-800 tracking-tight">
+                <h2 className="text-lg font-semibold text-slate-800">
                   NutriBuddy
                 </h2>
-                <p className="text-xs text-slate-500">Smart Nutrition Assistant</p>
+                <p className="text-xs text-slate-500">
+                  Smart Nutrition Assistant
+                </p>
               </div>
             </div>
 
@@ -171,14 +174,14 @@ export default function ChatPage() {
           </div>
 
           {/* Quick Prompts */}
-          <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-slate-200">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
             <p className="text-sm font-medium text-slate-600 mb-3">Quick prompts</p>
             <div className="flex flex-col gap-2">
               {quickPrompts.map((p) => (
                 <button
                   key={p}
                   onClick={() => form.setValue("message", p)}
-                  className="px-4 py-2 rounded-xl bg-[#F3F7F3] hover:bg-[#E8EFE8] text-[#2F7A4C] text-left transition-all duration-200"
+                  className="px-4 py-2 rounded-xl bg-[#F3F7F3] hover:bg-[#E8EFE8] text-[#2F7A4C] text-left transition"
                 >
                   {p}
                 </button>
@@ -187,7 +190,7 @@ export default function ChatPage() {
           </div>
 
           {/* Saved Plans */}
-          <div className="bg-white rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-slate-200">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
             <p className="text-sm font-medium text-slate-600 mb-3">Saved plans</p>
             <div className="flex flex-col gap-2 text-sm text-slate-700">
               <div className="px-4 py-2 border rounded-xl bg-white">
@@ -198,14 +201,14 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
-
         </aside>
 
-        {/* ---------------- CHAT MAIN ---------------- */}
-        <section className="col-span-12 md:col-span-6 bg-white rounded-3xl shadow-[0_2px_15px_rgba(0,0,0,0.04)] border border-slate-200 flex flex-col overflow-hidden">
+
+        {/* ---------------- CHAT PANEL ---------------- */}
+        <section className="col-span-12 md:col-span-6 bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
 
           {/* Header */}
-          <div className="px-6 py-5 border-b border-slate-200 backdrop-blur-xl bg-white/60">
+          <div className="px-6 py-5 border-b border-slate-200 bg-white/70 backdrop-blur">
             <ChatHeader>
               <ChatHeaderBlock />
               <ChatHeaderBlock className="justify-center items-center">
@@ -215,12 +218,13 @@ export default function ChatPage() {
                     <Image src="/logo.png" alt="logo" width={36} height={36} />
                   </AvatarFallback>
                 </Avatar>
-                <p className="text-slate-700 font-medium">Chat with {AI_NAME}</p>
+                <p className="text-slate-700 font-medium">
+                  Chat with {AI_NAME}
+                </p>
               </ChatHeaderBlock>
-
               <ChatHeaderBlock className="justify-end">
                 <Button variant="outline" size="sm" onClick={clearChat}>
-                  <PlusIcon className="size-4 mr-2" />
+                  <PlusIcon className="size-4 mr-1" />
                   {CLEAR_CHAT_TEXT}
                 </Button>
               </ChatHeaderBlock>
@@ -230,18 +234,19 @@ export default function ChatPage() {
           {/* Messages */}
           <div className="flex-1 px-6 py-6 overflow-y-auto bg-[#FAFAFA]">
             <div className="max-w-2xl mx-auto flex flex-col gap-4">
-              
+
               <MessageWall
                 messages={messages}
                 status={status}
                 durations={durations}
-                onDurationChange={(k: any, v: any) =>
+                onDurationChange={(k, v) =>
                   setDurations({ ...durations, [k]: v })
                 }
               />
 
+              {/* Typing Indicator */}
               {isTyping && (
-                <div className="text-sm text-slate-500 px-3 py-2 bg-slate-100 w-fit rounded-xl animate-pulse">
+                <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-500 text-sm w-fit animate-pulse">
                   NutriBuddy is typing…
                 </div>
               )}
@@ -251,7 +256,7 @@ export default function ChatPage() {
           </div>
 
           {/* Composer */}
-          <div className="px-6 py-4 border-t border-slate-200 bg-white/70 backdrop-blur-lg">
+          <div className="px-6 py-4 border-t border-slate-200 bg-white/75 backdrop-blur-sm">
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>
                 <Controller
@@ -270,7 +275,7 @@ export default function ChatPage() {
                           <Button
                             type="submit"
                             size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#2F7A4C] hover:bg-[#25633E] rounded-full"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-[#2F7A4C] hover:bg-[#25633E] shadow-md"
                             disabled={!field.value.trim()}
                           >
                             <ArrowUp className="size-5 text-white" />
@@ -281,7 +286,7 @@ export default function ChatPage() {
                           <Button
                             type="button"
                             size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-200 rounded-full"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-200"
                             onClick={() => stop()}
                           >
                             <Square className="size-5 text-slate-600" />
@@ -307,9 +312,15 @@ export default function ChatPage() {
               ))}
             </div>
           </div>
+
+          {/* Footer */}
+          <div className="px-5 py-3 text-xs text-slate-500 text-center">
+            © {new Date().getFullYear()} {OWNER_NAME} •{" "}
+            <Link href="/terms" className="underline">Terms</Link> • Powered by{" "}
+            <Link href="https://ringel.ai/" className="underline">Ringel.AI</Link>
+          </div>
         </section>
 
-        {/* RIGHT PANE (optional) */}
         <aside className="hidden md:flex col-span-3"></aside>
       </main>
     </div>
